@@ -79,7 +79,6 @@ fn generate_inter_kmes_certificates(directory: &str, kmes: &Vec<KmeConfig>, cert
             .set_not_after(&Asn1Time::days_from_now(ca_cert_exp_time_days as u32).unwrap())
             .unwrap();
         ca_cert_builder.set_serial_number(&gen_random_serial()).unwrap();
-        ca_cert_builder.sign(&ca_pkey, MessageDigest::sha256()).unwrap();
 
         let basic_constraints = BasicConstraints::new().ca().build().unwrap();
         ca_cert_builder.append_extension(basic_constraints).unwrap();
@@ -87,6 +86,12 @@ fn generate_inter_kmes_certificates(directory: &str, kmes: &Vec<KmeConfig>, cert
         let key_usage = KeyUsage::new().key_cert_sign().crl_sign().build().unwrap();
         ca_cert_builder.append_extension(key_usage).unwrap();
 
+        let ski = SubjectKeyIdentifier::new()
+            .build(&ca_cert_builder.x509v3_context(None, None))
+            .unwrap();
+        ca_cert_builder.append_extension(ski).unwrap();
+
+        ca_cert_builder.sign(&ca_pkey, MessageDigest::sha256()).unwrap();
         let ca_cert = ca_cert_builder.build();
 
         File::create(format!("{}/ca_kme{}.key", directory, kme.id))
@@ -215,14 +220,19 @@ fn generate_zone_certificates(directory: &str, kme_config: &KmeConfig, cert_exp_
         .set_not_after(&Asn1Time::days_from_now(ca_cert_exp_time_days as u32).unwrap())
         .unwrap();
     ca_builder.set_serial_number(&gen_random_serial()).unwrap();
-    ca_builder.sign(&ca_pkey, MessageDigest::sha256()).unwrap();
 
     let basic_constraints = BasicConstraints::new().ca().build().unwrap();
     ca_builder.append_extension(basic_constraints).unwrap();
 
     let key_usage = KeyUsage::new().key_cert_sign().crl_sign().build().unwrap();
     ca_builder.append_extension(key_usage).unwrap();
+    
+    let ski = SubjectKeyIdentifier::new()
+        .build(&ca_builder.x509v3_context(None, None))
+        .unwrap();
+    ca_builder.append_extension(ski).unwrap();
 
+    ca_builder.sign(&ca_pkey, MessageDigest::sha256()).unwrap();
     let ca_cert = ca_builder.build();
 
     File::create(format!("{}/ca.crt", directory))
